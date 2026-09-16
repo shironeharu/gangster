@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>갱스터 면접관리</title>
+<script>
+  // 저장된 테마를 화면이 그려지기 전에 먼저 적용해서 깜빡임(FOUC)을 막습니다.
+  (function () {
+    try {
+      var saved = localStorage.getItem("song-team-theme");
+      if (saved === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- 로그인 화면 -->
+  <section id="login-screen" class="screen">
+    <button id="theme-toggle-login" class="ghost icon-btn login-theme-toggle" title="다크모드 전환" aria-label="다크모드 전환">🌙</button>
+    <div class="login-box">
+      <img src="logo.png" alt="갱스터 면접관리" class="login-badge" />
+      <h1>갱스터 면접관리</h1>
+      <p class="sub">관리자 계정으로 로그인하세요</p>
+      <label>이름
+        <select id="login-name">
+          <option value="">선택하세요</option>
+        </select>
+      </label>
+      <p id="first-login-notice" class="notice hidden">처음 로그인하시네요. 앞으로 사용할 비밀번호를 정해주세요.</p>
+      <label>비밀번호
+        <div class="pw-field">
+          <input type="password" id="login-password" placeholder="비밀번호" autocomplete="off" />
+          <button type="button" class="pw-toggle" data-target="login-password">👁</button>
+        </div>
+      </label>
+      <label id="login-password-confirm-wrap" class="hidden">비밀번호 확인
+        <div class="pw-field">
+          <input type="password" id="login-password-confirm" placeholder="비밀번호 확인" autocomplete="off" />
+          <button type="button" class="pw-toggle" data-target="login-password-confirm">👁</button>
+        </div>
+      </label>
+      <button id="login-btn">로그인</button>
+      <p id="login-error" class="error"></p>
+    </div>
+  </section>
+
+  <!-- 메인 화면 -->
+  <section id="main-screen" class="screen hidden">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1><img src="logo.png" alt="" class="topbar-icon" /> 갱스터 면접관리</h1>
+        <div class="topbar-right">
+          <button id="theme-toggle" class="ghost icon-btn" title="다크모드 전환" aria-label="다크모드 전환">🌙</button>
+          <span id="current-user"></span>
+          <button id="account-manage-btn" class="ghost">계정 관리</button>
+          <button id="logout-btn" class="ghost">로그아웃</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-inner">
+      <div class="toolbar">
+        <input type="text" id="search-box" placeholder="닉네임 또는 ID로 검색" />
+        <button id="add-btn">+ 면접자 추가</button>
+      </div>
+
+      <div id="empty-msg" class="empty-msg hidden">
+        <div class="empty-icon">🎵</div>
+        <p>등록된 면접자가 없습니다.</p>
+      </div>
+
+      <div class="section-block">
+        <h2 class="section-title">미정 <span id="count-pending" class="section-count">0</span></h2>
+        <div class="table-wrap">
+          <table class="candidate-table">
+            <colgroup>
+              <col style="width:14%"><col style="width:10%"><col style="width:17%">
+              <col style="width:6%"><col style="width:8%"><col style="width:12%">
+              <col style="width:8%"><col style="width:8%"><col style="width:17%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>닉네임</th>
+                <th>ID</th>
+                <th>면접일정</th>
+                <th>나이</th>
+                <th>성별</th>
+                <th>1차 담당 면접관</th>
+                <th>1차 결과</th>
+                <th>2차 결과</th>
+                <th>변경 후 닉네임</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pending"></tbody>
+          </table>
+          <p id="empty-pending" class="section-empty hidden">해당 없음</p>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <h2 class="section-title pass">합격자 <span id="count-pass" class="section-count">0</span></h2>
+        <div class="table-wrap">
+          <table class="candidate-table">
+            <colgroup>
+              <col style="width:14%"><col style="width:10%"><col style="width:17%">
+              <col style="width:6%"><col style="width:8%"><col style="width:12%">
+              <col style="width:8%"><col style="width:8%"><col style="width:17%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>닉네임</th>
+                <th>ID</th>
+                <th>면접일정</th>
+                <th>나이</th>
+                <th>성별</th>
+                <th>1차 담당 면접관</th>
+                <th>1차 결과</th>
+                <th>2차 결과</th>
+                <th>변경 후 닉네임</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pass"></tbody>
+          </table>
+          <p id="empty-pass" class="section-empty hidden">해당 없음</p>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <h2 class="section-title fail">탈락자 <span id="count-fail" class="section-count">0</span></h2>
+        <div class="table-wrap">
+          <table class="candidate-table">
+            <colgroup>
+              <col style="width:14%"><col style="width:10%"><col style="width:17%">
+              <col style="width:6%"><col style="width:8%"><col style="width:12%">
+              <col style="width:8%"><col style="width:8%"><col style="width:17%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>닉네임</th>
+                <th>ID</th>
+                <th>면접일정</th>
+                <th>나이</th>
+                <th>성별</th>
+                <th>1차 담당 면접관</th>
+                <th>1차 결과</th>
+                <th>2차 결과</th>
+                <th>변경 후 닉네임</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-fail"></tbody>
+          </table>
+          <p id="empty-fail" class="section-empty hidden">해당 없음</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 상세/편집 모달 -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">면접자 추가</h2>
+        <button id="modal-close" class="ghost">닫기</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field-grid">
+          <label>닉네임
+            <input type="text" id="f-nickname" />
+          </label>
+          <label>ID
+            <input type="text" id="f-id" />
+          </label>
+          <label>면접일정
+            <input type="datetime-local" id="f-schedule" />
+          </label>
+          <label>1차 담당 면접관
+            <select id="f-interviewer">
+              <option value="">선택하세요</option>
+              <option value="윙윙">윙윙</option>
+              <option value="절미">절미</option>
+              <option value="하루">하루</option>
+            </select>
+          </label>
+          <label>2차 담당 면접관
+            <input type="text" id="f-interviewer2" readonly />
+          </label>
+          <label>나이
+            <input type="number" id="f-age" min="0" />
+          </label>
+          <label>성별
+            <select id="f-gender">
+              <option value="">선택하세요</option>
+              <option value="남성">남성</option>
+              <option value="여성">여성</option>
+            </select>
+          </label>
+          <label>변경 후 닉네임
+            <input type="text" id="f-newnickname" />
+          </label>
+        </div>
+
+        <div class="record-block">
+          <div class="record-block-head">
+            <span>1차 면접기록메모</span>
+            <select id="f-result1">
+              <option value="">미정</option>
+              <option value="합격">합격</option>
+              <option value="탈락">탈락</option>
+            </select>
+          </div>
+          <textarea id="f-record1" rows="4"></textarea>
+        </div>
+
+        <div class="record-block">
+          <div class="record-block-head">
+            <span>2차 면접 기록 <span id="record2-lock-note" class="lock-note hidden">(떵구만 수정 가능)</span></span>
+            <select id="f-result2">
+              <option value="">미정</option>
+              <option value="합격">합격</option>
+              <option value="탈락">탈락</option>
+            </select>
+          </div>
+          <textarea id="f-record2" rows="4"></textarea>
+        </div>
+
+        <p class="meta" id="modal-meta"></p>
+      </div>
+
+      <div class="modal-footer">
+        <button id="delete-btn" class="danger hidden">삭제</button>
+        <div class="spacer"></div>
+        <button id="cancel-btn" class="ghost">취소</button>
+        <button id="save-btn">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 계정 관리 모달 -->
+  <div id="account-modal" class="modal hidden">
+    <div class="modal-content narrow">
+      <div class="modal-header">
+        <h2>계정 관리</h2>
+        <button id="account-modal-close" class="ghost">닫기</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint">각 관리자의 현재 비밀번호를 확인하거나, 초기화하여 다음 로그인 때 새로 설정하도록 할 수 있습니다.</p>
+        <div id="account-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
