@@ -9,6 +9,7 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const candidatesRef = db.collection("candidates");
 const adminsRef = db.collection("admins");
+const membersRef = db.collection("members");
 
 // Firestore 보안 규칙이 "로그인(익명 포함)한 사용자만 read/write 가능"으로 되어 있으므로,
 // 페이지에 들어오면 바로 익명 로그인을 해서 그 조건을 만족시켜 둡니다.
@@ -31,6 +32,10 @@ const logoutBtn = document.getElementById("logout-btn");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleLogin = document.getElementById("theme-toggle-login");
 const currentUserLabel = document.getElementById("current-user");
+
+const tabButtons = document.querySelectorAll(".tab-btn");
+const tabPanelInterview = document.getElementById("tab-panel-interview");
+const tabPanelMembers = document.getElementById("tab-panel-members");
 
 const accountManageBtn = document.getElementById("account-manage-btn");
 const accountModal = document.getElementById("account-modal");
@@ -80,6 +85,72 @@ let editingId = null;
 let currentAdmin = null;
 let isFirstLoginMode = false;
 
+// ---- 팸원관리 ----
+const memberSearchBox = document.getElementById("member-search-box");
+const addMemberBtn = document.getElementById("add-member-btn");
+const memberEmptyMsg = document.getElementById("member-empty-msg");
+const memberTableWrap = document.getElementById("member-table-wrap");
+const memberTbody = document.getElementById("member-tbody");
+
+const memberModal = document.getElementById("member-modal");
+const memberModalTitle = document.getElementById("member-modal-title");
+const memberModalClose = document.getElementById("member-modal-close");
+const memberCancelBtn = document.getElementById("member-cancel-btn");
+const memberSaveBtn = document.getElementById("member-save-btn");
+const memberDeleteBtn = document.getElementById("member-delete-btn");
+const memberModalMeta = document.getElementById("member-modal-meta");
+
+const memberPhotoInput = document.getElementById("f-member-photo");
+const memberPhotoPreview = document.getElementById("member-photo-preview");
+const memberPhotoPlaceholder = document.getElementById("member-photo-placeholder");
+const memberPhotoPickBtn = document.getElementById("member-photo-pick-btn");
+const memberPhotoRemoveBtn = document.getElementById("member-photo-remove-btn");
+
+const warningReasonInput = document.getElementById("f-warning-reason");
+const warningMemoInput = document.getElementById("f-warning-memo");
+const warningPhotoInput = document.getElementById("f-warning-photo");
+const warningPhotoPickBtn = document.getElementById("warning-photo-pick-btn");
+const warningPhotoRemoveBtn = document.getElementById("warning-photo-remove-btn");
+const warningPhotoFilename = document.getElementById("warning-photo-filename");
+const addWarningBtn = document.getElementById("add-warning-btn");
+const memberWarningList = document.getElementById("member-warning-list");
+const memberWarningCount = document.getElementById("member-warning-count");
+
+const photoLightbox = document.getElementById("photo-lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+const lightboxClose = document.getElementById("lightbox-close");
+
+const memberFields = {
+  nickname: document.getElementById("f-member-nickname"),
+  rank: document.getElementById("f-member-rank"),
+  joinDate: document.getElementById("f-member-joindate"),
+  age: document.getElementById("f-member-age"),
+  gender: document.getElementById("f-member-gender"),
+  referrer: document.getElementById("f-member-referrer"),
+  memo: document.getElementById("f-member-memo"),
+};
+
+let allMembers = [];
+let editingMemberId = null;
+let currentMemberPhotoData = null; // base64 data URL, null = 없음
+let currentMemberWarnings = []; // [{reason, memo, photoData, at, by}]
+let pendingWarningPhoto = null; // 경고 추가 폼에서 아직 저장 전인 첨부 사진
+
+// ---- 사진 확대보기 (라이트박스) ----
+function openLightbox(dataUrl) {
+  if (!dataUrl) return;
+  lightboxImg.src = dataUrl;
+  photoLightbox.classList.remove("hidden");
+}
+function closeLightbox() {
+  photoLightbox.classList.add("hidden");
+  lightboxImg.src = "";
+}
+lightboxClose.addEventListener("click", closeLightbox);
+photoLightbox.addEventListener("click", (e) => {
+  if (e.target === photoLightbox) closeLightbox();
+});
+
 // ---- 로그인 화면 초기화 ----
 ADMIN_NAMES.forEach((name) => {
   const opt = document.createElement("option");
@@ -126,6 +197,18 @@ function toggleTheme() {
 });
 
 applyTheme(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
+
+// ---- 탭 전환 (면접관리 / 팸원관리) ----
+tabButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    tabButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    tabPanelInterview.classList.toggle("hidden", tab !== "interview");
+    tabPanelMembers.classList.toggle("hidden", tab !== "members");
+    if (tab === "members" && !membersSubscribed) subscribeMembers();
+  });
+});
 
 // ---- 이름 선택 시: 최초 로그인인지 확인해서 UI 전환 ----
 loginNameSelect.addEventListener("change", async () => {
@@ -234,6 +317,8 @@ logoutBtn.addEventListener("click", () => {
   mainScreen.classList.add("hidden");
   loginScreen.classList.remove("hidden");
   if (unsubscribe) unsubscribe();
+  if (unsubscribeMembers) unsubscribeMembers();
+  membersSubscribed = false;
 });
 
 // ---- 계정 관리 모달 (비밀번호 확인 / 초기화) ----
@@ -319,6 +404,121 @@ function subscribeCandidates() {
     }
   );
 }
+
+// ---- 팸원 목록 실시간 구독 ----
+let unsubscribeMembers = null;
+let membersSubscribed = false;
+function subscribeMembers() {
+  membersSubscribed = true;
+  if (unsubscribeMembers) unsubscribeMembers();
+  unsubscribeMembers = membersRef.orderBy("createdAt", "desc").onSnapshot(
+    (snap) => {
+      allMembers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderMemberTable();
+    },
+    (err) => {
+      console.error(err);
+      showToast("팸원 데이터를 불러오지 못했습니다: " + err.message);
+    }
+  );
+}
+
+const MEMBER_RANK_ORDER = ["패밀리장", "관리자", "패밀리원", "신입"];
+let memberSort = { field: null, dir: 1 }; // dir: 1=오름차순, -1=내림차순
+
+function memberSortValue(m, field) {
+  if (field === "rank") {
+    const idx = MEMBER_RANK_ORDER.indexOf(m.rank);
+    return idx === -1 ? MEMBER_RANK_ORDER.length : idx;
+  }
+  if (field === "age") return m.age === "" || m.age == null ? -Infinity : Number(m.age);
+  if (field === "warningCount") return (m.warnings || []).length;
+  if (field === "joinDate") return m.joinDate ? new Date(m.joinDate).getTime() : -Infinity;
+  return 0;
+}
+
+function sortMembers(list) {
+  if (!memberSort.field) return list;
+  const field = memberSort.field;
+  const dir = memberSort.dir;
+  return [...list].sort((a, b) => (memberSortValue(a, field) - memberSortValue(b, field)) * dir);
+}
+
+document.querySelectorAll('.member-table th.sortable').forEach((th) => {
+  th.addEventListener("click", () => {
+    const field = th.dataset.sort;
+    if (memberSort.field === field) {
+      memberSort.dir = memberSort.dir === 1 ? -1 : 1;
+    } else {
+      memberSort = { field, dir: 1 };
+    }
+    document.querySelectorAll('.member-table th.sortable').forEach((el) => {
+      el.classList.remove("sort-asc", "sort-desc");
+      if (el.dataset.sort === memberSort.field) {
+        el.classList.add(memberSort.dir === 1 ? "sort-asc" : "sort-desc");
+      }
+    });
+    renderMemberTable();
+  });
+});
+
+function renderMemberTable() {
+  const query = memberSearchBox.value.trim().toLowerCase();
+  const filtered = sortMembers(
+    allMembers.filter((m) => {
+      if (!query) return true;
+      return (m.nickname || "").toLowerCase().includes(query);
+    })
+  );
+
+  memberTbody.innerHTML = "";
+  memberEmptyMsg.classList.toggle("hidden", filtered.length !== 0);
+  memberTableWrap.classList.toggle("hidden", filtered.length === 0);
+
+  filtered.forEach((m) => {
+    const tr = document.createElement("tr");
+    const warningCount = (m.warnings || []).length;
+    tr.innerHTML = `
+      <td data-label="등급">${rankBadge(m.rank)}</td>
+      <td data-label="닉네임">${escapeHtml(m.nickname)}</td>
+      <td data-label="나이">${escapeHtml(m.age)}</td>
+      <td data-label="성별">${genderBadge(m.gender)}</td>
+      <td data-label="추천인">${escapeHtml(m.referrer)}</td>
+      <td data-label="경고">${warningCount > 0 ? `<span class="badge fail">${warningCount}회</span>` : `<span class="badge pass">없음</span>`}</td>
+      <td data-label="메모">${escapeHtml(m.memo)}</td>
+      <td data-label="사진"></td>
+      <td data-label="가입일정">${formatSchedule(m.joinDate)}</td>
+    `;
+    const photoTd = tr.querySelector('[data-label="사진"]');
+    if (m.photoData) {
+      const viewBtn = document.createElement("button");
+      viewBtn.type = "button";
+      viewBtn.className = "ghost photo-view-btn";
+      viewBtn.textContent = "보기";
+      viewBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openLightbox(m.photoData);
+      });
+      photoTd.appendChild(viewBtn);
+    } else {
+      const none = document.createElement("span");
+      none.className = "hint";
+      none.style.margin = "0";
+      none.textContent = "없음";
+      photoTd.appendChild(none);
+    }
+    tr.addEventListener("click", () => openMemberModal(m));
+    memberTbody.appendChild(tr);
+  });
+}
+
+function rankBadge(rank) {
+  if (!rank) return "";
+  const cls = { 패밀리장: "rank-leader", 관리자: "rank-admin", 패밀리원: "rank-member", 신입: "rank-new" }[rank] || "";
+  return `<span class="badge ${cls}">${escapeHtml(rank)}</span>`;
+}
+
+memberSearchBox.addEventListener("input", renderMemberTable);
 
 function classifyCandidate(c) {
   if (c.result1 === "탈락" || c.result2 === "탈락") return "fail";
@@ -534,6 +734,274 @@ deleteBtn.addEventListener("click", async () => {
     await candidatesRef.doc(editingId).delete();
     showToast("삭제되었습니다.");
     closeModal();
+  } catch (err) {
+    console.error(err);
+    showToast("삭제 실패: " + err.message);
+  }
+});
+
+// ---- 팸원 모달 ----
+function resetMemberPhoto() {
+  currentMemberPhotoData = null;
+  memberPhotoInput.value = "";
+  memberPhotoPreview.src = "";
+  memberPhotoPreview.classList.add("hidden");
+  memberPhotoPlaceholder.classList.remove("hidden");
+  memberPhotoRemoveBtn.classList.add("hidden");
+}
+
+function setMemberPhoto(dataUrl) {
+  currentMemberPhotoData = dataUrl;
+  if (dataUrl) {
+    memberPhotoPreview.src = dataUrl;
+    memberPhotoPreview.classList.remove("hidden");
+    memberPhotoPlaceholder.classList.add("hidden");
+    memberPhotoRemoveBtn.classList.remove("hidden");
+  } else {
+    resetMemberPhoto();
+  }
+}
+
+memberPhotoPickBtn.addEventListener("click", () => memberPhotoInput.click());
+memberPhotoRemoveBtn.addEventListener("click", () => resetMemberPhoto());
+
+memberPhotoInput.addEventListener("change", () => {
+  const file = memberPhotoInput.files[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("이미지 파일만 업로드할 수 있습니다.");
+    return;
+  }
+  resizeImageToDataUrl(file, 480, 0.72).then(setMemberPhoto).catch((err) => {
+    console.error(err);
+    showToast("이미지를 처리하지 못했습니다.");
+  });
+});
+
+// 이미지를 캔버스로 리사이즈/압축해서 Firestore에 저장 가능한 크기의 base64로 변환
+function resizeImageToDataUrl(file, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---- 경고 기록 ----
+function renderWarningList() {
+  memberWarningCount.textContent = currentMemberWarnings.length;
+  memberWarningList.innerHTML = "";
+  currentMemberWarnings.forEach((w, idx) => {
+    const li = document.createElement("li");
+    li.className = "warning-item";
+    const when = w.at ? formatDateTimeText(w.at) : "";
+    li.innerHTML = `
+      <div class="warning-item-text">
+        <span class="warning-reason">${escapeHtml(w.reason)}</span>
+        ${w.memo ? `<span class="warning-memo">${escapeHtml(w.memo)}</span>` : ""}
+        <span class="warning-meta">${escapeHtml(w.by || "")} ${escapeHtml(when)}</span>
+      </div>
+    `;
+    const actions = document.createElement("div");
+    actions.className = "warning-item-actions";
+    if (w.photoData) {
+      const viewBtn = document.createElement("button");
+      viewBtn.type = "button";
+      viewBtn.className = "ghost warning-view-btn";
+      viewBtn.textContent = "사진 보기";
+      viewBtn.addEventListener("click", () => openLightbox(w.photoData));
+      actions.appendChild(viewBtn);
+    }
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost warning-remove-btn";
+    removeBtn.textContent = "삭제";
+    removeBtn.addEventListener("click", () => {
+      currentMemberWarnings.splice(idx, 1);
+      renderWarningList();
+    });
+    actions.appendChild(removeBtn);
+    li.appendChild(actions);
+    memberWarningList.appendChild(li);
+  });
+}
+
+function resetWarningPhotoField() {
+  pendingWarningPhoto = null;
+  warningPhotoInput.value = "";
+  warningPhotoFilename.textContent = "";
+  warningPhotoRemoveBtn.classList.add("hidden");
+}
+
+warningPhotoPickBtn.addEventListener("click", () => warningPhotoInput.click());
+warningPhotoRemoveBtn.addEventListener("click", resetWarningPhotoField);
+
+warningPhotoInput.addEventListener("change", () => {
+  const file = warningPhotoInput.files[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("이미지 파일만 첨부할 수 있습니다.");
+    return;
+  }
+  resizeImageToDataUrl(file, 480, 0.72)
+    .then((dataUrl) => {
+      pendingWarningPhoto = dataUrl;
+      warningPhotoFilename.textContent = file.name;
+      warningPhotoRemoveBtn.classList.remove("hidden");
+    })
+    .catch((err) => {
+      console.error(err);
+      showToast("이미지를 처리하지 못했습니다.");
+    });
+});
+
+addWarningBtn.addEventListener("click", () => {
+  const reason = warningReasonInput.value.trim();
+  if (!reason) {
+    showToast("경고 사유를 입력하세요.");
+    return;
+  }
+  currentMemberWarnings.push({
+    reason,
+    memo: warningMemoInput.value.trim(),
+    photoData: pendingWarningPhoto || "",
+    by: currentAdmin || "",
+    at: new Date().toISOString(),
+  });
+  warningReasonInput.value = "";
+  warningMemoInput.value = "";
+  resetWarningPhotoField();
+  renderWarningList();
+});
+
+warningReasonInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addWarningBtn.click();
+  }
+});
+
+function resetMemberFields() {
+  Object.values(memberFields).forEach((el) => (el.value = ""));
+  resetMemberPhoto();
+  currentMemberWarnings = [];
+  warningReasonInput.value = "";
+  warningMemoInput.value = "";
+  resetWarningPhotoField();
+  renderWarningList();
+}
+
+function openMemberModal(member) {
+  resetMemberFields();
+  memberModalMeta.textContent = "";
+  if (member) {
+    editingMemberId = member.id;
+    memberModalTitle.textContent = "팸원 정보";
+    memberFields.nickname.value = member.nickname || "";
+    memberFields.rank.value = member.rank || "";
+    memberFields.joinDate.value = member.joinDate || "";
+    memberFields.age.value = member.age || "";
+    memberFields.gender.value = member.gender || "";
+    memberFields.referrer.value = member.referrer || "";
+    memberFields.memo.value = member.memo || "";
+    currentMemberWarnings = (member.warnings || []).map((w) => ({ ...w }));
+    renderWarningList();
+    if (member.photoData) setMemberPhoto(member.photoData);
+    memberDeleteBtn.classList.remove("hidden");
+    const created = member.createdAt ? formatDateTimeText(member.createdAt) : "";
+    const updated = member.updatedAt ? formatDateTimeText(member.updatedAt) : "";
+    memberModalMeta.textContent = `등록: ${member.createdBy || "-"} (${created}) / 최근 수정: ${member.updatedBy || "-"} (${updated})`;
+  } else {
+    editingMemberId = null;
+    memberModalTitle.textContent = "팸원 추가";
+    memberDeleteBtn.classList.add("hidden");
+  }
+  memberModal.classList.remove("hidden");
+}
+
+function closeMemberModal() {
+  memberModal.classList.add("hidden");
+  editingMemberId = null;
+}
+
+addMemberBtn.addEventListener("click", () => openMemberModal(null));
+memberModalClose.addEventListener("click", closeMemberModal);
+memberCancelBtn.addEventListener("click", closeMemberModal);
+memberModal.addEventListener("click", (e) => {
+  if (e.target === memberModal) closeMemberModal();
+});
+
+memberSaveBtn.addEventListener("click", async () => {
+  const nickname = memberFields.nickname.value.trim();
+  if (!nickname) {
+    showToast("닉네임을 입력하세요.");
+    return;
+  }
+
+  const actorName = currentAdmin || "알수없음";
+  const now = new Date().toISOString();
+
+  const data = {
+    nickname,
+    rank: memberFields.rank.value,
+    joinDate: memberFields.joinDate.value,
+    age: memberFields.age.value ? Number(memberFields.age.value) : "",
+    gender: memberFields.gender.value,
+    referrer: memberFields.referrer.value.trim(),
+    memo: memberFields.memo.value,
+    photoData: currentMemberPhotoData || "",
+    warnings: currentMemberWarnings,
+    updatedAt: now,
+    updatedBy: actorName,
+  };
+
+  memberSaveBtn.disabled = true;
+  try {
+    if (editingMemberId) {
+      await membersRef.doc(editingMemberId).update(data);
+      showToast("저장되었습니다.");
+    } else {
+      data.createdAt = now;
+      data.createdBy = actorName;
+      await membersRef.add(data);
+      showToast("추가되었습니다.");
+    }
+    closeMemberModal();
+  } catch (err) {
+    console.error(err);
+    showToast("저장 실패: " + err.message);
+  } finally {
+    memberSaveBtn.disabled = false;
+  }
+});
+
+memberDeleteBtn.addEventListener("click", async () => {
+  if (!editingMemberId) return;
+  if (!confirm("이 팸원 정보를 삭제할까요? 되돌릴 수 없습니다.")) return;
+  try {
+    await membersRef.doc(editingMemberId).delete();
+    showToast("삭제되었습니다.");
+    closeMemberModal();
   } catch (err) {
     console.error(err);
     showToast("삭제 실패: " + err.message);
