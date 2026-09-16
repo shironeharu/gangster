@@ -169,8 +169,21 @@
 
     <div id="tab-panel-members" class="page-inner hidden">
       <div class="toolbar">
-        <input type="text" id="member-search-box" placeholder="닉네임으로 검색" />
+        <input type="text" id="member-search-box" placeholder="닉네임 또는 ID로 검색" />
         <button id="add-member-btn">+ 팸원 추가</button>
+      </div>
+
+      <div id="member-mobile-sort" class="mobile-sort-bar">
+        <select id="member-sort-field">
+          <option value="">정렬: 기본</option>
+          <option value="rank">직책순</option>
+          <option value="nickname">닉네임순</option>
+          <option value="age">나이순</option>
+          <option value="gender">성별순</option>
+          <option value="warningCount">경고순</option>
+          <option value="joinDate">가입일순</option>
+        </select>
+        <button type="button" id="member-sort-dir-btn" class="ghost">오름차순</button>
       </div>
 
       <div id="member-empty-msg" class="empty-msg hidden">
@@ -181,16 +194,18 @@
       <div id="member-table-wrap" class="table-wrap member-table-wrap">
         <table class="candidate-table member-table">
           <colgroup>
-            <col style="width:9%"><col style="width:16%"><col style="width:6%">
-            <col style="width:7%"><col style="width:10%"><col style="width:8%">
-            <col style="width:20%"><col style="width:9%"><col style="width:15%">
+            <col style="width:9%"><col style="width:14%"><col style="width:9%">
+            <col style="width:6%"><col style="width:7%"><col style="width:9%">
+            <col style="width:8%"><col style="width:18%"><col style="width:8%">
+            <col style="width:12%">
           </colgroup>
           <thead>
             <tr>
-              <th class="sortable" data-sort="rank">등급<span class="sort-arrow"></span></th>
-              <th>닉네임</th>
+              <th class="sortable" data-sort="rank">직책<span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort="nickname">닉네임<span class="sort-arrow"></span></th>
+              <th>ID</th>
               <th class="sortable" data-sort="age">나이<span class="sort-arrow"></span></th>
-              <th>성별</th>
+              <th class="sortable" data-sort="gender">성별<span class="sort-arrow"></span></th>
               <th>추천인</th>
               <th class="sortable" data-sort="warningCount">경고<span class="sort-arrow"></span></th>
               <th>메모</th>
@@ -309,17 +324,21 @@
 
       <div class="modal-body">
         <div class="field-grid">
-          <label>등급
+          <label>직책
             <select id="f-member-rank">
               <option value="">선택하세요</option>
               <option value="패밀리장">패밀리장</option>
               <option value="관리자">관리자</option>
               <option value="패밀리원">패밀리원</option>
               <option value="신입">신입</option>
+              <option value="용병">용병</option>
             </select>
           </label>
           <label>닉네임
             <input type="text" id="f-member-nickname" />
+          </label>
+          <label>ID
+            <input type="text" id="f-member-id" />
           </label>
           <label>나이
             <input type="number" id="f-member-age" min="0" />
