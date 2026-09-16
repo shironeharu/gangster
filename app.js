@@ -90,6 +90,7 @@ const memberSearchBox = document.getElementById("member-search-box");
 const addMemberBtn = document.getElementById("add-member-btn");
 const memberEmptyMsg = document.getElementById("member-empty-msg");
 const memberTableWrap = document.getElementById("member-table-wrap");
+const memberTotalCount = document.getElementById("member-total-count");
 const memberTbody = document.getElementById("member-tbody");
 
 const memberModal = document.getElementById("member-modal");
@@ -503,6 +504,7 @@ memberSortDirBtn.addEventListener("click", () => {
 syncMemberSortUI();
 
 function renderMemberTable() {
+  memberTotalCount.textContent = allMembers.length + "명";
   const query = memberSearchBox.value.trim().toLowerCase();
   const filtered = sortMembers(
     allMembers.filter((m) => {
