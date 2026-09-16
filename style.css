@@ -352,13 +352,34 @@ button.danger:hover { box-shadow: 0 8px 20px rgba(239, 74, 95, 0.34); }
   margin: 0 auto;
 }
 
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 20px 32px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  background: transparent;
+  color: var(--sub);
+  box-shadow: none;
+  border-radius: 10px 10px 0 0;
+  padding: 10px 18px;
+  border-bottom: 2px solid transparent;
+}
+.tab-btn:hover { background: var(--accent-soft); color: var(--text); }
+.tab-btn.active {
+  color: var(--accent);
+  background: transparent;
+  border-bottom: 2px solid var(--accent);
+}
+
 .toolbar {
   display: flex;
   gap: 12px;
   padding: 20px 32px 4px;
   flex-wrap: wrap;
 }
-#search-box {
+#search-box, #member-search-box {
   flex: 1;
   min-width: 200px;
   padding: 11px 16px;
@@ -370,12 +391,12 @@ button.danger:hover { box-shadow: 0 8px 20px rgba(239, 74, 95, 0.34); }
   color: var(--text);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-#search-box:focus {
+#search-box:focus, #member-search-box:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
-#search-box::placeholder {
+#search-box::placeholder, #member-search-box::placeholder {
   color: var(--sub);
   opacity: 0.85;
 }
@@ -416,6 +437,7 @@ button.danger:hover { box-shadow: 0 8px 20px rgba(239, 74, 95, 0.34); }
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
+.member-table-wrap { margin: 20px 32px 32px; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th, td {
   text-align: left;
@@ -441,6 +463,33 @@ th {
   letter-spacing: 0.02em;
   background: var(--surface-alt);
 }
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s;
+}
+th.sortable:hover { color: var(--accent); }
+.sort-arrow {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.sort-arrow::before, .sort-arrow::after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  opacity: 0.35;
+}
+.sort-arrow::before { border-bottom: 4px solid currentColor; }
+.sort-arrow::after { border-top: 4px solid currentColor; }
+th.sortable.sort-asc .sort-arrow::before { opacity: 1; }
+th.sortable.sort-desc .sort-arrow::after { opacity: 1; }
+th.sortable.sort-asc, th.sortable.sort-desc { color: var(--accent); }
 tbody tr { cursor: pointer; transition: background 0.12s; }
 tbody tr:hover { background: var(--accent-soft); }
 tbody tr:last-child td { border-bottom: none; }
@@ -461,6 +510,121 @@ tbody tr td:first-child { font-weight: 700; }
 .badge.pass { background: var(--badge-pass-bg); color: var(--badge-pass-fg); }
 .badge.fail { background: var(--danger-soft); color: var(--danger-hover); }
 .badge.pending { background: var(--badge-pending-bg); color: var(--badge-pending-fg); }
+.badge.rank-leader { background: var(--badge-fail-bg, var(--danger-soft)); color: var(--danger-hover); }
+.badge.rank-admin { background: var(--badge-male-bg); color: var(--badge-male-fg); }
+.badge.rank-member { background: var(--badge-pass-bg); color: var(--badge-pass-fg); }
+.badge.rank-new { background: var(--badge-pending-bg); color: var(--badge-pending-fg); }
+
+/* ---------------- 팸원관리 ---------------- */
+.photo-upload {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.photo-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1.5px solid var(--border);
+}
+.photo-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  color: var(--sub);
+  text-align: center;
+  background: var(--surface-alt);
+}
+.photo-upload-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.photo-upload-actions button { padding: 7px 14px; font-size: 12.5px; }
+
+.warning-add-box {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.warning-add-box input[type="text"], .warning-add-box textarea {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--input-bg);
+  color: var(--text);
+  resize: vertical;
+}
+.warning-add-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.warning-add-photo-row button { flex-shrink: 0; padding: 8px 14px; font-size: 12.5px; }
+.warning-add-photo-row .spacer { flex: 1; min-width: 8px; }
+
+.warning-view-btn, .photo-view-btn {
+  padding: 5px 10px;
+  font-size: 11.5px;
+  flex-shrink: 0;
+}
+
+/* ---------------- 사진 확대보기 ---------------- */
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+.lightbox-content img {
+  max-width: 90vw;
+  max-height: 90vh;
+  display: block;
+  border-radius: 12px;
+}
+#lightbox-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  background: var(--card);
+}
+
+.warning-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.warning-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--danger-soft);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.warning-item-text { display: flex; flex-direction: column; gap: 2px; }
+.warning-reason { font-size: 13px; font-weight: 600; color: var(--danger-hover); }
+.warning-memo { font-size: 12px; color: var(--text); }
+.warning-meta { font-size: 11px; color: var(--sub); }
+.warning-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.warning-remove-btn { padding: 5px 10px; font-size: 11.5px; flex-shrink: 0; }
 
 .record-block { margin-top: 16px; }
 .record-block-head {
@@ -666,6 +830,9 @@ tbody tr td:first-child { font-weight: 700; }
     justify-content: center;
   }
   .section-block { margin: 0 16px; }
+  .tabs { padding: 14px 16px 0; }
+  .tab-btn { flex: 1; text-align: center; padding: 10px 8px; font-size: 12.5px; }
+  .photo-upload { flex-direction: column; align-items: flex-start; }
   .topbar-right button, .topbar-right #current-user {
     flex: 1;
     text-align: center;
