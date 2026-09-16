@@ -122,6 +122,7 @@ const lightboxClose = document.getElementById("lightbox-close");
 
 const memberFields = {
   nickname: document.getElementById("f-member-nickname"),
+  id: document.getElementById("f-member-id"),
   rank: document.getElementById("f-member-rank"),
   joinDate: document.getElementById("f-member-joindate"),
   age: document.getElementById("f-member-age"),
@@ -423,7 +424,9 @@ function subscribeMembers() {
   );
 }
 
-const MEMBER_RANK_ORDER = ["패밀리장", "관리자", "패밀리원", "신입"];
+const MEMBER_RANK_ORDER = ["패밀리장", "관리자", "패밀리원", "신입", "용병"];
+const MEMBER_GENDER_ORDER = ["남성", "여성"];
+const MEMBER_SORT_IS_TEXT = { nickname: true }; // 문자열(가나다) 비교가 필요한 필드
 let memberSort = { field: null, dir: 1 }; // dir: 1=오름차순, -1=내림차순
 
 function memberSortValue(m, field) {
@@ -431,43 +434,83 @@ function memberSortValue(m, field) {
     const idx = MEMBER_RANK_ORDER.indexOf(m.rank);
     return idx === -1 ? MEMBER_RANK_ORDER.length : idx;
   }
+  if (field === "gender") {
+    const idx = MEMBER_GENDER_ORDER.indexOf(m.gender);
+    return idx === -1 ? MEMBER_GENDER_ORDER.length : idx;
+  }
+  if (field === "nickname") return m.nickname || "";
   if (field === "age") return m.age === "" || m.age == null ? -Infinity : Number(m.age);
   if (field === "warningCount") return (m.warnings || []).length;
   if (field === "joinDate") return m.joinDate ? new Date(m.joinDate).getTime() : -Infinity;
   return 0;
 }
 
+function compareMemberField(a, b, field) {
+  const va = memberSortValue(a, field);
+  const vb = memberSortValue(b, field);
+  if (MEMBER_SORT_IS_TEXT[field]) return va.localeCompare(vb, "ko");
+  return va - vb;
+}
+
 function sortMembers(list) {
   if (!memberSort.field) return list;
   const field = memberSort.field;
   const dir = memberSort.dir;
-  return [...list].sort((a, b) => (memberSortValue(a, field) - memberSortValue(b, field)) * dir);
+  return [...list].sort((a, b) => {
+    const primary = compareMemberField(a, b, field) * dir;
+    if (primary !== 0) return primary;
+    // 같은 값끼리는 닉네임 가나다순으로 2차 정렬
+    return (a.nickname || "").localeCompare(b.nickname || "", "ko");
+  });
+}
+
+const memberSortFieldSelect = document.getElementById("member-sort-field");
+const memberSortDirBtn = document.getElementById("member-sort-dir-btn");
+
+function syncMemberSortUI() {
+  document.querySelectorAll('.member-table th.sortable').forEach((el) => {
+    el.classList.remove("sort-asc", "sort-desc");
+    if (el.dataset.sort === memberSort.field) {
+      el.classList.add(memberSort.dir === 1 ? "sort-asc" : "sort-desc");
+    }
+  });
+  memberSortFieldSelect.value = memberSort.field || "";
+  memberSortDirBtn.textContent = memberSort.dir === 1 ? "오름차순" : "내림차순";
+  memberSortDirBtn.disabled = !memberSort.field;
+}
+
+function setMemberSort(field, dir) {
+  memberSort = field ? { field, dir } : { field: null, dir: 1 };
+  syncMemberSortUI();
+  renderMemberTable();
 }
 
 document.querySelectorAll('.member-table th.sortable').forEach((th) => {
   th.addEventListener("click", () => {
     const field = th.dataset.sort;
-    if (memberSort.field === field) {
-      memberSort.dir = memberSort.dir === 1 ? -1 : 1;
-    } else {
-      memberSort = { field, dir: 1 };
-    }
-    document.querySelectorAll('.member-table th.sortable').forEach((el) => {
-      el.classList.remove("sort-asc", "sort-desc");
-      if (el.dataset.sort === memberSort.field) {
-        el.classList.add(memberSort.dir === 1 ? "sort-asc" : "sort-desc");
-      }
-    });
-    renderMemberTable();
+    const dir = memberSort.field === field ? (memberSort.dir === 1 ? -1 : 1) : 1;
+    setMemberSort(field, dir);
   });
 });
+
+memberSortFieldSelect.addEventListener("change", () => {
+  setMemberSort(memberSortFieldSelect.value || null, 1);
+});
+memberSortDirBtn.addEventListener("click", () => {
+  if (!memberSort.field) return;
+  setMemberSort(memberSort.field, memberSort.dir === 1 ? -1 : 1);
+});
+syncMemberSortUI();
 
 function renderMemberTable() {
   const query = memberSearchBox.value.trim().toLowerCase();
   const filtered = sortMembers(
     allMembers.filter((m) => {
       if (!query) return true;
-      return (m.nickname || "").toLowerCase().includes(query);
+      return (
+        (m.nickname || "").toLowerCase().includes(query) ||
+        (m.memberId || "").toLowerCase().includes(query)
+      );
     })
   );
 
@@ -479,8 +522,9 @@ function renderMemberTable() {
     const tr = document.createElement("tr");
     const warningCount = (m.warnings || []).length;
     tr.innerHTML = `
-      <td data-label="등급">${rankBadge(m.rank)}</td>
+      <td data-label="직책">${rankBadge(m.rank)}</td>
       <td data-label="닉네임">${escapeHtml(m.nickname)}</td>
+      <td data-label="ID">${escapeHtml(m.memberId)}</td>
       <td data-label="나이">${escapeHtml(m.age)}</td>
       <td data-label="성별">${genderBadge(m.gender)}</td>
       <td data-label="추천인">${escapeHtml(m.referrer)}</td>
@@ -514,7 +558,7 @@ function renderMemberTable() {
 
 function rankBadge(rank) {
   if (!rank) return "";
-  const cls = { 패밀리장: "rank-leader", 관리자: "rank-admin", 패밀리원: "rank-member", 신입: "rank-new" }[rank] || "";
+  const cls = { 패밀리장: "rank-leader", 관리자: "rank-admin", 패밀리원: "rank-member", 신입: "rank-new", 용병: "rank-mercenary" }[rank] || "";
   return `<span class="badge ${cls}">${escapeHtml(rank)}</span>`;
 }
 
@@ -918,6 +962,7 @@ function openMemberModal(member) {
     editingMemberId = member.id;
     memberModalTitle.textContent = "팸원 정보";
     memberFields.nickname.value = member.nickname || "";
+    memberFields.id.value = member.memberId || "";
     memberFields.rank.value = member.rank || "";
     memberFields.joinDate.value = member.joinDate || "";
     memberFields.age.value = member.age || "";
@@ -963,6 +1008,7 @@ memberSaveBtn.addEventListener("click", async () => {
 
   const data = {
     nickname,
+    memberId: memberFields.id.value.trim(),
     rank: memberFields.rank.value,
     joinDate: memberFields.joinDate.value,
     age: memberFields.age.value ? Number(memberFields.age.value) : "",
