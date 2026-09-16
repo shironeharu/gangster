@@ -334,7 +334,7 @@ function renderRow(c) {
     <td data-label="면접일정">${formatSchedule(c.schedule)}</td>
     <td data-label="나이">${escapeHtml(c.age)}</td>
     <td data-label="성별">${genderBadge(c.gender)}</td>
-    <td data-label="1차 담당 면접관">${escapeHtml(c.interviewer)}</td>
+    <td data-label="1차 담당 면접관">${c.interviewer ? escapeHtml(c.interviewer) : '<span class="badge pending">미정</span>'}</td>
     <td data-label="1차 결과">${resultBadge(c.result1)}</td>
     <td data-label="2차 결과">${resultBadge(c.result2)}</td>
     <td data-label="변경 후 닉네임">${escapeHtml(c.newnickname)}</td>
