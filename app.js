@@ -213,16 +213,6 @@ tabButtons.forEach((btn) => {
 });
 
 // ---- 입장 방식 / 서버에서 검증하는 로그인 ----
-function selectLoginMode(mode) {
-  for (const role of ["viewer", "admin"]) {
-    document.getElementById(role + "-login-form").classList.toggle("hidden", mode !== role);
-    document.getElementById(role + "-mode-btn").setAttribute("aria-pressed", String(mode === role));
-  }
-  loginError.textContent = "";
-  document.getElementById("viewer-login-error").textContent = "";
-}
-document.getElementById("viewer-mode-btn").onclick = () => selectLoginMode("viewer");
-document.getElementById("admin-mode-btn").onclick = () => selectLoginMode("admin");
 async function signInRole(role, name, password, button, error) {
   if (!password || (role === "admin" && !ADMIN_NAMES.includes(name))) {
     error.textContent = "이름과 비밀번호를 확인해주세요.";

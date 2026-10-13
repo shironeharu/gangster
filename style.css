@@ -157,6 +157,7 @@ h1, h2 { font-weight: 800; letter-spacing: -0.02em; }
 }
 
 .login-box {
+  text-align: center;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 22px;
@@ -204,6 +205,7 @@ h1, h2 { font-weight: 800; letter-spacing: -0.02em; }
 }
 
 .login-box input, .login-box select {
+  text-align: center;
   display: block;
   width: 100%;
   margin-top: 7px;
@@ -971,7 +973,7 @@ tbody tr td:first-child { font-weight: 700; }
 
 /* 역할 선택 및 읽기 전용 상세 화면 */
 .login-modes { display: flex; gap: 8px; margin-bottom: 20px; }
-.login-modes button { flex: 1; }
+.login-modes button { flex: 1; padding-inline: 8px; white-space: nowrap; }
 .login-modes button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
 #viewer-login-btn { width: 100%; margin-top: 16px; }
 .viewer-mode #member-save-btn, .viewer-mode #member-delete-btn,
