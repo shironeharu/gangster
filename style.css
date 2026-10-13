@@ -255,7 +255,7 @@ h1, h2 { font-weight: 800; letter-spacing: -0.02em; }
   position: relative;
 }
 .pw-field input {
-  padding-right: 42px !important;
+  padding-inline: 42px !important;
 }
 .pw-toggle {
   position: absolute;
@@ -270,7 +270,7 @@ h1, h2 { font-weight: 800; letter-spacing: -0.02em; }
   border-radius: 8px;
   box-shadow: none;
 }
-.pw-toggle:hover {
+.pw-toggle:hover, .pw-toggle:active {
   background: var(--accent-soft);
   transform: translateY(-50%);
 }
@@ -792,6 +792,24 @@ tbody tr td:first-child { font-weight: 700; }
 .modal-footer .spacer { flex: 1; }
 
 /* ---------------- Account management ---------------- */
+.shared-password-settings {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.shared-password-settings h3,
+.shared-password-settings .hint,
+.shared-password-settings #shared-password-status { margin: 0; }
+.shared-password-settings h3 { font-size: 16px; }
+.shared-password-settings .hint { line-height: 1.65; }
+.shared-password-settings label { display: grid; gap: 8px; }
+.shared-password-settings input { margin-top: 0; }
+#shared-password-save { justify-self: start; margin-top: 4px; }
+#shared-password-status { font-size: 12.5px; line-height: 1.5; }
+#shared-password-status:empty { display: none; }
+
 .account-row {
   display: flex;
   align-items: center;
