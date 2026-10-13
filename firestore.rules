@@ -5,7 +5,7 @@ service cloud.firestore {
       return s.keys().hasOnly(['role', 'name', 'password'])
         && s.password is string && s.password.size() >= 4
         && ((s.role == 'admin'
-          && s.name in ['윙윙', '절미', '하루', '떵구']
+          && s.name in ['절미', '하루', '떵구']
           && s.password == get(/databases/$(database)/documents/admins/$(s.name)).data.password)
         || (s.role == 'viewer' && s.name == ''
           && s.password == get(/databases/$(database)/documents/settings/viewerAccess).data.password));
@@ -34,7 +34,7 @@ service cloud.firestore {
     match /admins/{name} {
       allow read: if admin();
       allow create, update: if admin()
-        && name in ['윙윙', '절미', '하루', '떵구']
+        && name in ['절미', '하루', '떵구']
         && request.resource.data.password is string
         && request.resource.data.password.size() >= 4;
     }

@@ -1,5 +1,5 @@
 // ---- 관리자 목록 ----
-const ADMIN_NAMES = ["윙윙", "절미", "하루", "떵구"];
+const ADMIN_NAMES = ["절미", "하루", "떵구"];
 const SECOND_ROUND_INTERVIEWER = "떵구"; // 2차 면접은 항상 떵구가 담당
 const SESSION_KEY = "song-team-current-admin";
 const THEME_KEY = "song-team-theme";

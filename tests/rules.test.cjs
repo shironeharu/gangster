@@ -9,6 +9,8 @@ test('뷰어 조회 전용, 관리자 권한, 비밀번호 변경 및 로그아�
     await env.withSecurityRulesDisabled(async c => {
       const db = c.firestore();
       await setDoc(doc(db,'admins/하루'), {password:'admin-secret'});
+      await setDoc(doc(db,'admins/윙윙'), {password:'former-secret'});
+      await setDoc(doc(db,'accessSessions/former'), {role:'admin',name:'윙윙',password:'former-secret'});
       await setDoc(doc(db,'settings/viewerAccess'), {password:'family-secret'});
       await setDoc(doc(db,'members/member'), {nickname:'테스트'});
       await setDoc(doc(db,'candidates/candidate'), {nickname:'면접자'});
@@ -16,6 +18,10 @@ test('뷰어 조회 전용, 관리자 권한, 비밀번호 변경 및 로그아�
     const viewer = env.authenticatedContext('viewer').firestore();
     const admin = env.authenticatedContext('admin').firestore();
     const guest = env.unauthenticatedContext().firestore();
+    const former = env.authenticatedContext('former').firestore();
+    await assertFails(getDocs(collection(former,'candidates')));
+    await assertFails(updateDoc(doc(former,'members/member'), {nickname:'탈퇴자 수정'}));
+    await assertFails(setDoc(doc(former,'accessSessions/former'), {role:'admin',name:'윙윙',password:'former-secret'}));
     await assertFails(getDoc(doc(guest,'members/member')));
     await assertFails(getDocs(collection(viewer,'members')));
     await assertFails(setDoc(doc(viewer,'accessSessions/viewer'), {role:'viewer',name:'',password:'wrong'}));
