@@ -509,8 +509,21 @@ tbody tr:hover { background: var(--accent-soft); }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr td:first-child { font-weight: 700; }
 
-.schedule-date { font-weight: 600; }
-.schedule-time { font-size: 12px; color: var(--sub); margin-top: 2px; }
+.schedule-date { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.schedule-time { font-size: 12px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 긴 값은 열 안에서 요약하고 전체 내용은 행 클릭으로 확인합니다. */
+.candidate-table th, .candidate-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+@media (min-width: 701px) and (max-width: 1200px) {
+  .candidate-table th, .candidate-table td { padding: 12px 6px; font-size: 12px; }
+  .candidate-table .badge { padding: 3px 5px; font-size: 11px; }
+  .candidate-table .sort-arrow { margin-left: 2px; }
+}
 
 .badge {
   display: inline-block;

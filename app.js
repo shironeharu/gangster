@@ -658,7 +658,8 @@ function formatSchedule(iso) {
   if (!iso) return "";
   const parts = scheduleParts(iso);
   if (!parts) return escapeHtml(iso);
-  return `<div class="schedule-date">${parts.date}</div><div class="schedule-time">${parts.time}</div>`;
+  const compactDate = parts.date.replace("년 ", ".").replace("월 ", ".").replace("일", "");
+  return `<div class="schedule-date">${compactDate}</div><div class="schedule-time">${parts.time}</div>`;
 }
 
 searchBox.addEventListener("input", renderTable);
