@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function validSession(s) {
+      return s.keys().hasOnly(['role', 'name', 'password'])
+        && s.password is string && s.password.size() >= 4
+        && ((s.role == 'admin'
+          && s.name in ['윙윙', '절미', '하루', '떵구']
+          && s.password == get(/databases/$(database)/documents/admins/$(s.name)).data.password)
+        || (s.role == 'viewer' && s.name == ''
+          && s.password == get(/databases/$(database)/documents/settings/viewerAccess).data.password));
+    }
+    function signedIn() {
+      return request.auth != null
+        && validSession(get(/databases/$(database)/documents/accessSessions/$(request.auth.uid)).data);
+    }
+    function admin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/accessSessions/$(request.auth.uid)).data.role == 'admin';
+    }
+    match /accessSessions/{uid} {
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && validSession(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow read: if false;
+    }
+    match /members/{id} {
+      allow read: if signedIn();
+      allow write: if admin();
+    }
+    match /candidates/{id} {
+      allow read, write: if admin();
+    }
+    match /admins/{name} {
+      allow read: if admin();
+      allow create, update: if admin()
+        && name in ['윙윙', '절미', '하루', '떵구']
+        && request.resource.data.password is string
+        && request.resource.data.password.size() >= 4;
+    }
+    match /settings/viewerAccess {
+      allow read: if admin();
+      allow create, update: if admin()
+        && request.resource.data.password is string
+        && request.resource.data.password.size() >= 4;
+    }
+  }
+}

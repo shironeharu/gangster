@@ -968,3 +968,13 @@ tbody tr td:first-child { font-weight: 700; }
   from { opacity: 0; transform: translate(-50%, 8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* 역할 선택 및 읽기 전용 상세 화면 */
+.login-modes { display: flex; gap: 8px; margin-bottom: 20px; }
+.login-modes button { flex: 1; }
+.login-modes button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
+#viewer-login-btn { width: 100%; margin-top: 16px; }
+.viewer-mode #member-save-btn, .viewer-mode #member-delete-btn,
+.viewer-mode .warning-add-box, .viewer-mode .photo-upload-actions { display: none !important; }
+.viewer-mode #member-modal input:disabled, .viewer-mode #member-modal select:disabled,
+.viewer-mode #member-modal textarea:disabled { opacity: 1; color: inherit; -webkit-text-fill-color: currentColor; }

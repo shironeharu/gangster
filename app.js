@@ -11,12 +11,12 @@ const candidatesRef = db.collection("candidates");
 const adminsRef = db.collection("admins");
 const membersRef = db.collection("members");
 
-// Firestore 보안 규칙이 "로그인(익명 포함)한 사용자만 read/write 가능"으로 되어 있으므로,
-// 페이지에 들어오면 바로 익명 로그인을 해서 그 조건을 만족시켜 둡니다.
-// (실제 비밀번호 검증은 Firebase Auth가 아니라 Firestore의 admins 컬렉션으로 직접 합니다.)
-auth.signInAnonymously().catch((err) => {
-  console.error("anonymous sign-in failed", err);
-});
+// 권한은 firestore.rules에서 검증한 사용자별 세션으로 결정합니다.
+const authReady = auth.signInAnonymously();
+authReady.catch((err) => console.error("anonymous sign-in failed", err));
+const accessRef = db.collection("settings").doc("viewerAccess");
+function sessionRef() { return db.collection("accessSessions").doc(auth.currentUser.uid); }
+let currentRole = null;
 
 // ---- DOM ----
 const loginScreen = document.getElementById("login-screen");
@@ -83,7 +83,6 @@ const fields = {
 let allCandidates = [];
 let editingId = null;
 let currentAdmin = null;
-let isFirstLoginMode = false;
 
 // ---- 팸원관리 ----
 const memberSearchBox = document.getElementById("member-search-box");
@@ -203,6 +202,7 @@ applyTheme(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
 // ---- 탭 전환 (면접관리 / 팸원관리) ----
 tabButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
+    if (!currentRole || (!currentAdmin && btn.dataset.tab === "interview")) return;
     tabButtons.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     const tab = btn.dataset.tab;
@@ -212,119 +212,108 @@ tabButtons.forEach((btn) => {
   });
 });
 
-// ---- 이름 선택 시: 최초 로그인인지 확인해서 UI 전환 ----
-loginNameSelect.addEventListener("change", async () => {
+// ---- 입장 방식 / 서버에서 검증하는 로그인 ----
+function selectLoginMode(mode) {
+  for (const role of ["viewer", "admin"]) {
+    document.getElementById(role + "-login-form").classList.toggle("hidden", mode !== role);
+    document.getElementById(role + "-mode-btn").setAttribute("aria-pressed", String(mode === role));
+  }
   loginError.textContent = "";
-  loginPasswordInput.value = "";
-  loginPasswordConfirmInput.value = "";
-  const name = loginNameSelect.value;
-  if (!name) {
-    firstLoginNotice.classList.add("hidden");
-    loginPasswordConfirmWrap.classList.add("hidden");
-    isFirstLoginMode = false;
-    return;
-  }
-  try {
-    const doc = await adminsRef.doc(name).get();
-    const hasPassword = doc.exists && doc.data().password;
-    isFirstLoginMode = !hasPassword;
-    firstLoginNotice.classList.toggle("hidden", !isFirstLoginMode);
-    loginPasswordConfirmWrap.classList.toggle("hidden", !isFirstLoginMode);
-    loginBtn.textContent = isFirstLoginMode ? "비밀번호 설정하고 로그인" : "로그인";
-  } catch (err) {
-    console.error(err);
-    loginError.textContent = "계정 정보를 불러오지 못했습니다.";
-  }
-});
-
-// ---- 로그인 / 최초 비밀번호 설정 ----
-loginBtn.addEventListener("click", async () => {
-  const name = loginNameSelect.value;
-  const password = loginPasswordInput.value;
-  loginError.textContent = "";
-
-  if (!name) {
-    loginError.textContent = "이름을 선택하세요.";
-    return;
-  }
-  if (!password) {
-    loginError.textContent = "비밀번호를 입력하세요.";
-    return;
-  }
-  if (password.length < 4) {
-    loginError.textContent = "비밀번호는 4자 이상으로 입력하세요.";
-    return;
-  }
-
-  loginBtn.disabled = true;
-
-  try {
-    if (isFirstLoginMode) {
-      const confirm = loginPasswordConfirmInput.value;
-      if (password !== confirm) {
-        loginError.textContent = "비밀번호 확인이 일치하지 않습니다.";
-        loginBtn.disabled = false;
-        return;
-      }
-      await adminsRef.doc(name).set({
-        password,
-        updatedAt: new Date().toISOString(),
-      });
-      loginSuccess(name);
-    } else {
-      const doc = await adminsRef.doc(name).get();
-      if (!doc.exists || doc.data().password !== password) {
-        loginError.textContent = "비밀번호가 올바르지 않습니다.";
-        loginBtn.disabled = false;
-        return;
-      }
-      loginSuccess(name);
-    }
-  } catch (err) {
-    console.error(err);
-    loginError.textContent = "로그인 처리 중 오류가 발생했습니다: " + err.message;
-  } finally {
-    loginBtn.disabled = false;
-  }
-});
-
-[loginPasswordInput, loginPasswordConfirmInput].forEach((input) => {
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") loginBtn.click();
-  });
-});
-
-function loginSuccess(name) {
-  currentAdmin = name;
-  localStorage.setItem(SESSION_KEY, name);
-  enterMainScreen();
+  document.getElementById("viewer-login-error").textContent = "";
 }
+document.getElementById("viewer-mode-btn").onclick = () => selectLoginMode("viewer");
+document.getElementById("admin-mode-btn").onclick = () => selectLoginMode("admin");
+async function signInRole(role, name, password, button, error) {
+  if (!password || (role === "admin" && !ADMIN_NAMES.includes(name))) {
+    error.textContent = "이름과 비밀번호를 확인해주세요.";
+    return;
+  }
+  button.disabled = true;
+  error.textContent = "";
+  try {
+    await authReady;
+    // 잘못된 비밀번호는 Firestore 규칙에서 쓰기 자체가 거절됩니다.
+    await sessionRef().set({role, name, password});
+    currentRole = role;
+    currentAdmin = role === "admin" ? name : null;
+    enterMainScreen();
+  } catch (err) {
+    error.textContent = err.code === "permission-denied"
+      ? "비밀번호가 올바르지 않거나 아직 설정되지 않았습니다. 관리자에게 문의하세요."
+      : "입장하지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.";
+  } finally { button.disabled = false; }
+}
+loginBtn.onclick = () => signInRole("admin", loginNameSelect.value, loginPasswordInput.value, loginBtn, loginError);
+const viewerLoginBtn = document.getElementById("viewer-login-btn");
+viewerLoginBtn.onclick = () => signInRole("viewer", "", document.getElementById("viewer-password").value,
+  viewerLoginBtn, document.getElementById("viewer-login-error"));
+loginPasswordInput.onkeydown = (e) => { if (e.key === "Enter") loginBtn.click(); };
+document.getElementById("viewer-password").onkeydown = (e) => { if (e.key === "Enter") viewerLoginBtn.click(); };
 
 function enterMainScreen() {
-  currentUserLabel.textContent = `${currentAdmin}님`;
+  const admin = currentRole === "admin";
+  document.body.classList.toggle("viewer-mode", !admin);
+  currentUserLabel.textContent = admin ? currentAdmin + "님 (관리자)" : "패밀리원 · 읽기 전용";
   loginScreen.classList.add("hidden");
   mainScreen.classList.remove("hidden");
   loginPasswordInput.value = "";
-  loginPasswordConfirmInput.value = "";
-  subscribeCandidates();
+  document.getElementById("viewer-password").value = "";
+  accountManageBtn.classList.toggle("hidden", !admin);
+  addMemberBtn.classList.toggle("hidden", !admin);
+  tabButtons.forEach((btn) => {
+    btn.classList.toggle("hidden", !admin && btn.dataset.tab === "interview");
+    btn.classList.toggle("active", btn.dataset.tab === (admin ? "interview" : "members"));
+  });
+  tabPanelInterview.classList.toggle("hidden", !admin);
+  tabPanelMembers.classList.toggle("hidden", admin);
+  if (admin) subscribeCandidates(); else subscribeMembers();
 }
-
-logoutBtn.addEventListener("click", () => {
+function clearSessionUI() {
+  currentRole = null;
   currentAdmin = null;
-  localStorage.removeItem(SESSION_KEY);
-  loginNameSelect.value = "";
-  firstLoginNotice.classList.add("hidden");
-  loginPasswordConfirmWrap.classList.add("hidden");
-  loginBtn.textContent = "로그인";
-  mainScreen.classList.add("hidden");
-  loginScreen.classList.remove("hidden");
   if (unsubscribe) unsubscribe();
   if (unsubscribeMembers) unsubscribeMembers();
+  unsubscribe = unsubscribeMembers = null;
   membersSubscribed = false;
-});
+  allCandidates = []; allMembers = [];
+  renderTable(); renderMemberTable();
+  closeModal(); closeMemberModal(); closeLightbox();
+  accountModal.classList.add("hidden");
+  accountList.innerHTML = "";
+  document.getElementById("shared-password").value = "";
+  document.getElementById("shared-password-confirm").value = "";
+  mainScreen.classList.add("hidden");
+  loginScreen.classList.remove("hidden");
+  localStorage.removeItem(SESSION_KEY);
+}
+logoutBtn.onclick = async () => {
+  logoutBtn.disabled = true;
+  try { await sessionRef().delete(); clearSessionUI(); }
+  catch (err) { showToast("로그아웃 실패. 연결 상태를 확인해주세요."); }
+  finally { logoutBtn.disabled = false; }
+};
+document.getElementById("shared-password-save").onclick = async () => {
+  if (!currentAdmin) return;
+  const input = document.getElementById("shared-password");
+  const confirmation = document.getElementById("shared-password-confirm");
+  const status = document.getElementById("shared-password-status");
+  if (input.value.length < 4 || input.value !== confirmation.value) {
+    status.textContent = "4자 이상 입력하고 비밀번호 확인을 일치시켜주세요.";
+    return;
+  }
+  const button = document.getElementById("shared-password-save");
+  button.disabled = true;
+  try {
+    await accessRef.set({password: input.value, updatedAt: new Date().toISOString(), updatedBy: currentAdmin});
+    input.value = confirmation.value = "";
+    status.textContent = "공용 비밀번호가 저장되었습니다.";
+  } catch (err) { status.textContent = "저장하지 못했습니다. 다시 시도해주세요."; }
+  finally { button.disabled = false; }
+};
 
 // ---- 계정 관리 모달 (비밀번호 확인 / 초기화) ----
 accountManageBtn.addEventListener("click", async () => {
+  if (!currentAdmin) return;
   await renderAccountList();
   accountModal.classList.remove("hidden");
 });
@@ -334,6 +323,7 @@ accountModal.addEventListener("click", (e) => {
 });
 
 async function renderAccountList() {
+  if (!currentAdmin) return;
   accountList.innerHTML = "<p class='hint'>불러오는 중...</p>";
   const snap = await adminsRef.get();
   const data = {};
@@ -377,12 +367,22 @@ async function renderAccountList() {
 
       const resetBtn = document.createElement("button");
       resetBtn.className = "ghost";
-      resetBtn.textContent = "초기화";
+      resetBtn.textContent = "비밀번호 재설정";
       resetBtn.addEventListener("click", async () => {
-        if (!confirm(`${name}님의 비밀번호를 초기화할까요? 다음 로그인 때 새로 설정하게 됩니다.`)) return;
-        await adminsRef.doc(name).delete();
-        showToast(`${name}님의 비밀번호가 초기화되었습니다.`);
-        renderAccountList();
+  if (!currentAdmin) return;
+        const password = prompt(`${name}님의 새 비밀번호를 입력하세요 (4자 이상).`);
+        if (password === null) return;
+        if (password.length < 4) { showToast("비밀번호는 4자 이상이어야 합니다."); return; }
+        try {
+          await adminsRef.doc(name).set({password, updatedAt: new Date().toISOString()});
+          if (name === currentAdmin) {
+            clearSessionUI();
+            showToast("새 비밀번호로 다시 로그인해주세요.");
+          } else {
+            showToast(`${name}님의 비밀번호가 변경되었습니다.`);
+            await renderAccountList();
+          }
+        } catch (err) { showToast("비밀번호를 변경하지 못했습니다."); }
       });
       row.appendChild(resetBtn);
     }
@@ -394,6 +394,7 @@ async function renderAccountList() {
 // ---- 목록 실시간 구독 ----
 let unsubscribe = null;
 function subscribeCandidates() {
+  if (!currentAdmin) return;
   if (unsubscribe) unsubscribe();
   unsubscribe = candidatesRef.orderBy("createdAt", "desc").onSnapshot(
     (snap) => {
@@ -420,7 +421,10 @@ function subscribeMembers() {
     },
     (err) => {
       console.error(err);
-      showToast("팸원 데이터를 불러오지 못했습니다: " + err.message);
+      if (err.code === "permission-denied") {
+        clearSessionUI();
+        showToast("입장 권한이 만료되었습니다. 새 비밀번호로 다시 입장해주세요.");
+      } else showToast("팸원 데이터를 불러오지 못했습니다: " + err.message);
     }
   );
 }
@@ -675,6 +679,7 @@ function resetFields() {
 }
 
 function openModal(candidate) {
+  if (!currentAdmin) return;
   resetFields();
   modalMeta.textContent = "";
   if (candidate) {
@@ -727,6 +732,7 @@ editModal.addEventListener("click", (e) => {
 });
 
 saveBtn.addEventListener("click", async () => {
+  if (!currentAdmin) return;
   const nickname = fields.nickname.value.trim();
   if (!nickname) {
     showToast("닉네임을 입력하세요.");
@@ -774,6 +780,7 @@ saveBtn.addEventListener("click", async () => {
 });
 
 deleteBtn.addEventListener("click", async () => {
+  if (!currentAdmin) return;
   if (!editingId) return;
   if (!confirm("이 면접자 정보를 삭제할까요? 되돌릴 수 없습니다.")) return;
   try {
@@ -883,10 +890,11 @@ function renderWarningList() {
     removeBtn.className = "ghost warning-remove-btn";
     removeBtn.textContent = "삭제";
     removeBtn.addEventListener("click", () => {
+      if (!currentAdmin) return;
       currentMemberWarnings.splice(idx, 1);
       renderWarningList();
     });
-    actions.appendChild(removeBtn);
+    if (currentAdmin) actions.appendChild(removeBtn);
     li.appendChild(actions);
     memberWarningList.appendChild(li);
   });
@@ -922,6 +930,7 @@ warningPhotoInput.addEventListener("change", () => {
 });
 
 addWarningBtn.addEventListener("click", () => {
+  if (!currentAdmin) return;
   const reason = warningReasonInput.value.trim();
   if (!reason) {
     showToast("경고 사유를 입력하세요.");
@@ -958,6 +967,8 @@ function resetMemberFields() {
 }
 
 function openMemberModal(member) {
+  if (!currentRole || (!currentAdmin && !member)) return;
+  Object.values(memberFields).forEach((el) => { el.disabled = !currentAdmin; });
   resetMemberFields();
   memberModalMeta.textContent = "";
   if (member) {
@@ -999,6 +1010,7 @@ memberModal.addEventListener("click", (e) => {
 });
 
 memberSaveBtn.addEventListener("click", async () => {
+  if (!currentAdmin) return;
   const nickname = memberFields.nickname.value.trim();
   if (!nickname) {
     showToast("닉네임을 입력하세요.");
@@ -1044,6 +1056,7 @@ memberSaveBtn.addEventListener("click", async () => {
 });
 
 memberDeleteBtn.addEventListener("click", async () => {
+  if (!currentAdmin) return;
   if (!editingMemberId) return;
   if (!confirm("이 팸원 정보를 삭제할까요? 되돌릴 수 없습니다.")) return;
   try {
@@ -1056,11 +1069,5 @@ memberDeleteBtn.addEventListener("click", async () => {
   }
 });
 
-// 이전에 로그인한 적 있으면 자동 로그인 유지 (모든 초기화가 끝난 뒤 마지막에 실행)
-(function restoreSession() {
-  const saved = localStorage.getItem(SESSION_KEY);
-  if (saved && ADMIN_NAMES.includes(saved)) {
-    currentAdmin = saved;
-    enterMainScreen();
-  }
-})();
+// 이름만 저장된 과거 세션으로 관리자 권한을 부여하지 않습니다.
+localStorage.removeItem(SESSION_KEY);

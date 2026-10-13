@@ -1,0 +1,29 @@
+{
+  "name": "gangster",
+  "version": "1.0.0",
+  "description": "관리자(윙윙, 절미, 하루, 떵구)가 함께 사용하는 면접자/팸원 관리 사이트입니다.\r GitHub Pages로 배포하고, 데이터 저장은 Firebase(Firestore)를 사용합니다.\r 상단에 **면접관리** / **팸원관리** 두 개의 탭이 있습니다.",
+  "main": "app.js",
+  "scripts": {
+    "test": "node --test tests/ui.test.cjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-gangster \"node --test tests/rules.test.cjs\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shironeharu/gangster.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/shironeharu/gangster/issues"
+  },
+  "homepage": "https://github.com/shironeharu/gangster#readme",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0",
+    "firebase-tools": "^15.33.0",
+    "jsdom": "^30.1.2"
+  },
+  "private": true
+}
