@@ -243,6 +243,11 @@ document.getElementById("viewer-password").onkeydown = (e) => { if (e.key === "E
 function enterMainScreen() {
   const admin = currentRole === "admin";
   document.body.classList.toggle("viewer-mode", !admin);
+  const warningSort = memberSortFieldSelect.querySelector('option[value="warningCount"]');
+  warningSort.hidden = !admin;
+  warningSort.disabled = !admin;
+  if (!admin && memberSort.field === "warningCount") setMemberSort(null, 1);
+  memberWarningList.closest('.record-block').classList.toggle('hidden', !admin);
   currentUserLabel.textContent = admin ? currentAdmin + "님 (관리자)" : "패밀리원 · 읽기 전용";
   loginScreen.classList.add("hidden");
   mainScreen.classList.remove("hidden");
@@ -475,6 +480,7 @@ function syncMemberSortUI() {
 }
 
 function setMemberSort(field, dir) {
+  if (!currentAdmin && field === "warningCount") return;
   memberSort = field ? { field, dir } : { field: null, dir: 1 };
   syncMemberSortUI();
   renderMemberTable();
@@ -524,7 +530,7 @@ function renderMemberTable() {
       <td data-label="나이">${escapeHtml(m.age)}</td>
       <td data-label="성별">${genderBadge(m.gender)}</td>
       <td data-label="추천인">${escapeHtml(m.referrer)}</td>
-      <td data-label="경고">${warningCount > 0 ? `<span class="badge fail">${warningCount}회</span>` : `<span class="badge pass">없음</span>`}</td>
+      <td data-label="경고">${currentAdmin ? (warningCount > 0 ? `<span class="badge fail">${warningCount}회</span>` : `<span class="badge pass">없음</span>`) : ""}</td>
       <td data-label="메모">${escapeHtml(m.memo)}</td>
       <td data-label="사진"></td>
       <td data-label="가입일정">${formatSchedule(m.joinDate)}</td>
@@ -973,7 +979,7 @@ function openMemberModal(member) {
     memberFields.gender.value = member.gender || "";
     memberFields.referrer.value = member.referrer || "";
     memberFields.memo.value = member.memo || "";
-    currentMemberWarnings = (member.warnings || []).map((w) => ({ ...w }));
+    currentMemberWarnings = currentAdmin ? (member.warnings || []).map((w) => ({ ...w })) : [];
     renderWarningList();
     if (member.photoData) setMemberPhoto(member.photoData);
     memberDeleteBtn.classList.remove("hidden");

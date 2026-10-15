@@ -27,6 +27,9 @@ test('뷰어와 관리자 화면 전환 및 수정 이벤트 방어', async () =
   w.openMemberModal({id:'one',nickname:'팸원',warnings:[{reason:'기록'}]});
   assert.equal(el('f-member-nickname').disabled,true);
   assert.equal(w.document.querySelector('.warning-remove-btn'),null);
+  assert.equal(el('member-warning-list').children.length, 0);
+  assert.equal(el('member-warning-list').closest('.record-block').classList.contains('hidden'), true);
+  assert.equal(el('member-sort-field').querySelector('[value="warningCount"]').disabled, true);
   const before=calls.length;
   el('member-save-btn').click(); el('member-delete-btn').click(); el('save-btn').click();
   assert.equal(calls.length,before);
@@ -36,7 +39,10 @@ test('뷰어와 관리자 화면 전환 및 수정 이벤트 방어', async () =
   await el('login-btn').onclick();
   assert.equal(el('tab-panel-interview').classList.contains('hidden'),false);
   assert.equal(calls.some(c=>c[0]==='subscribe' && c[1]==='candidates'),true);
-  w.openMemberModal({id:'one',nickname:'팸원',warnings:[]});
+  w.openMemberModal({id:'one',nickname:'팸원',warnings:[{reason:'관리자 전용 기록'}]});
+  assert.equal(el('member-warning-list').children.length, 1);
+  assert.equal(el('member-warning-list').closest('.record-block').classList.contains('hidden'), false);
+  assert.equal(el('member-sort-field').querySelector('[value="warningCount"]').disabled, false);
   assert.equal(el('f-member-nickname').disabled,false);
   dom.window.close();
 });

@@ -1009,5 +1009,8 @@ tbody tr td:first-child { font-weight: 700; }
 #viewer-login-btn { width: 100%; margin-top: 16px; }
 .viewer-mode #member-save-btn, .viewer-mode #member-delete-btn,
 .viewer-mode .warning-add-box, .viewer-mode .photo-upload-actions { display: none !important; }
+.viewer-mode .member-table th[data-sort="warningCount"],
+.viewer-mode .member-table td[data-label="경고"],
+.viewer-mode .member-table col:nth-child(7) { display: none !important; }
 .viewer-mode #member-modal input:disabled, .viewer-mode #member-modal select:disabled,
 .viewer-mode #member-modal textarea:disabled { opacity: 1; color: inherit; -webkit-text-fill-color: currentColor; }
