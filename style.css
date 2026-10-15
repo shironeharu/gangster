@@ -453,6 +453,13 @@ button.danger:hover { box-shadow: 0 8px 20px rgba(239, 74, 95, 0.34); }
   font-weight: 600;
 }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+/* ID는 상세 화면에서 확인하며, 목록에서는 해당 열 공간도 제거합니다. */
+.candidate-table:not(.member-table) th:nth-child(2),
+.candidate-table:not(.member-table) td:nth-child(2),
+.candidate-table:not(.member-table) col:nth-child(2),
+.member-table th:nth-child(3),
+.member-table td:nth-child(3),
+.member-table col:nth-child(3) { display: none !important; }
 th, td {
   text-align: left;
   padding: 13px 14px;
